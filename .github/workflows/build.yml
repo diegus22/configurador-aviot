@@ -1,0 +1,45 @@
+name: Build Windows EXE + Installer
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pyserial pyinstaller
+
+      - name: Build EXE
+        run: |
+          pyinstaller --onefile --windowed --name "Configurador_Aviot" --icon=aviot.ico --add-data "logo_aviot.png;." configurador_aviot.py
+
+      - name: Download CH340 driver
+        run: |
+          mkdir drivers
+          curl -L -o drivers/CH341SER.EXE "https://cdn.sparkfun.com/assets/learn_tutorials/8/4/4/CH341SER.EXE"
+
+      - name: Build Installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Configurador_Aviot
+          path: dist/Configurador_Aviot.exe
+
+      - name: Upload Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Instalador_Configurador_Aviot
+          path: Output/Instalador_Configurador_Aviot.exe

@@ -1,0 +1,9 @@
+venv/
+dist/
+build/
+Output/
+drivers/
+__pycache__/
+*.pyc
+*.spec
+docs_*.pdf
