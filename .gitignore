@@ -7,3 +7,4 @@ __pycache__/
 *.pyc
 *.spec
 docs_*.pdf
+_release_assets/

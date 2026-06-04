@@ -370,7 +370,7 @@ class DeviceIO(Device):
             col = ttk.Frame(fout)
             col.grid(row=0, column=i, padx=2)
             fout.columnconfigure(i, weight=1)
-            ttk.Label(col, text=f"DO{i+1}", font=("Arial", 9, "bold"),
+            ttk.Label(col, text=f"DO{i+1}", font=("Arial", 8, "bold"),
                       background=AVIOT_BLANCO).pack()
             led = tk.Canvas(col, width=22, height=22, bg=AVIOT_BLANCO,
                             highlightthickness=0)
@@ -404,7 +404,7 @@ class DeviceIO(Device):
             col = ttk.Frame(fin)
             col.grid(row=0, column=i, padx=2)
             fin.columnconfigure(i, weight=1)
-            ttk.Label(col, text=f"DI{i+1}", font=("Arial", 9, "bold"),
+            ttk.Label(col, text=f"DI{i+1}", font=("Arial", 8, "bold"),
                       background=AVIOT_BLANCO).pack()
             led = tk.Canvas(col, width=22, height=22, bg=AVIOT_BLANCO,
                             highlightthickness=0)
@@ -541,7 +541,7 @@ class App:
         self.root = root
         self.root.title(f"Configurador Aviot - Multi-dispositivo  ({VERSION})")
         self.root.configure(bg=AVIOT_BLANCO)
-        self.root.minsize(820, 860)
+        self.root.minsize(720, 560)
         self.ser = None
         self.slave_id = 1
         self.ocupado = False
@@ -582,27 +582,27 @@ class App:
         s.theme_use('clam')
         s.configure(".", background=AVIOT_BLANCO, foreground=AVIOT_OSCURO)
         s.configure("TFrame", background=AVIOT_BLANCO)
-        s.configure("TLabelframe", background=AVIOT_BLANCO, font=("Arial", 11, "bold"))
+        s.configure("TLabelframe", background=AVIOT_BLANCO, font=("Arial", 9, "bold"))
         s.configure("TLabelframe.Label", background=AVIOT_BLANCO,
-                    foreground=AVIOT_NARANJA, font=("Arial", 11, "bold"))
-        s.configure("Aviot.TButton", font=("Arial", 11, "bold"), padding=8,
+                    foreground=AVIOT_NARANJA, font=("Arial", 9, "bold"))
+        s.configure("Aviot.TButton", font=("Arial", 9, "bold"), padding=4,
                     background=AVIOT_NARANJA, foreground=AVIOT_BLANCO)
         s.map("Aviot.TButton",
               background=[('active', AVIOT_NARANJA_HOVER), ('pressed', AVIOT_OSCURO)])
-        s.configure("Dark.TButton", font=("Arial", 11, "bold"), padding=8,
+        s.configure("Dark.TButton", font=("Arial", 9, "bold"), padding=4,
                     background=AVIOT_OSCURO, foreground=AVIOT_BLANCO)
         s.map("Dark.TButton", background=[('active', "#333"), ('pressed', AVIOT_NARANJA)])
-        s.configure("Header.TLabel", font=("Arial", 18, "bold"),
+        s.configure("Header.TLabel", font=("Arial", 14, "bold"),
                     foreground=AVIOT_NARANJA, background=AVIOT_BLANCO)
-        s.configure("Sub.TLabel", font=("Arial", 10), foreground="#888",
+        s.configure("Sub.TLabel", font=("Arial", 8), foreground="#888",
                     background=AVIOT_BLANCO)
-        s.configure("Info.TLabel", font=("Arial", 12), background=AVIOT_BLANCO)
-        s.configure("Big.TLabel", font=("Arial", 22, "bold"), background=AVIOT_BLANCO)
-        s.configure("OK.TLabel", font=("Arial", 12, "bold"),
+        s.configure("Info.TLabel", font=("Arial", 10), background=AVIOT_BLANCO)
+        s.configure("Big.TLabel", font=("Arial", 15, "bold"), background=AVIOT_BLANCO)
+        s.configure("OK.TLabel", font=("Arial", 10, "bold"),
                     foreground=AVIOT_VERDE, background=AVIOT_BLANCO)
-        s.configure("Warn.TLabel", font=("Arial", 12, "bold"),
+        s.configure("Warn.TLabel", font=("Arial", 10, "bold"),
                     foreground=AVIOT_AMBAR, background=AVIOT_BLANCO)
-        s.configure("Err.TLabel", font=("Arial", 12, "bold"),
+        s.configure("Err.TLabel", font=("Arial", 10, "bold"),
                     foreground=AVIOT_ROJO, background=AVIOT_BLANCO)
 
     # ----------------------------- UI -----------------------------
@@ -610,7 +610,7 @@ class App:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(1, weight=1)
 
-        top = ttk.Frame(self.root, padding=(20, 12, 20, 4))
+        top = ttk.Frame(self.root, padding=(14, 6, 14, 2))
         top.grid(row=0, column=0, sticky="ew")
         top.columnconfigure(0, weight=1)
 
@@ -634,7 +634,7 @@ class App:
         fdev = ttk.LabelFrame(top, text=" Dispositivo ", padding=10)
         fdev.grid(row=2, column=0, sticky="ew", pady=(0, 6))
         fdev.columnconfigure(0, weight=1)
-        self.combo_dev = ttk.Combobox(fdev, state="readonly", font=("Arial", 12),
+        self.combo_dev = ttk.Combobox(fdev, state="readonly", font=("Arial", 9),
                                       values=[c.LABEL for c in DEVICE_CLASSES])
         self.combo_dev.current(0)
         self.combo_dev.grid(row=0, column=0, sticky="ew")
@@ -648,16 +648,16 @@ class App:
         fcon = ttk.LabelFrame(top, text=" Conexion ", padding=10)
         fcon.grid(row=3, column=0, sticky="ew", pady=(0, 6))
         fcon.columnconfigure(1, weight=1)
-        ttk.Label(fcon, text="Puerto:", font=("Arial", 11)).grid(row=0, column=0, sticky="w")
-        self.combo_puerto = ttk.Combobox(fcon, width=26, font=("Arial", 11), state="readonly")
+        ttk.Label(fcon, text="Puerto:", font=("Arial", 9)).grid(row=0, column=0, sticky="w")
+        self.combo_puerto = ttk.Combobox(fcon, width=26, font=("Arial", 9), state="readonly")
         self.combo_puerto.grid(row=0, column=1, padx=5, sticky="ew")
         ttk.Button(fcon, text="Actualizar", command=self.actualizar_puertos).grid(row=0, column=2, padx=4)
 
-        ttk.Label(fcon, text="Baudrate:", font=("Arial", 11)).grid(row=1, column=0, sticky="w", pady=(6, 0))
-        self.combo_baud = ttk.Combobox(fcon, width=10, font=("Arial", 11), state="readonly")
+        ttk.Label(fcon, text="Baudrate:", font=("Arial", 9)).grid(row=1, column=0, sticky="w", pady=(6, 0))
+        self.combo_baud = ttk.Combobox(fcon, width=10, font=("Arial", 9), state="readonly")
         self.combo_baud.grid(row=1, column=1, padx=5, sticky="w", pady=(6, 0))
-        ttk.Label(fcon, text="ID:", font=("Arial", 11)).grid(row=1, column=2, sticky="e", pady=(6, 0))
-        self.spin_id = ttk.Spinbox(fcon, from_=1, to=247, width=5, font=("Arial", 11))
+        ttk.Label(fcon, text="ID:", font=("Arial", 9)).grid(row=1, column=2, sticky="e", pady=(6, 0))
+        self.spin_id = ttk.Spinbox(fcon, from_=1, to=247, width=5, font=("Arial", 9))
         self.spin_id.grid(row=1, column=3, padx=5, pady=(6, 0))
 
         self.btn_conectar = ttk.Button(fcon, text="Conectar", style="Aviot.TButton",
@@ -678,8 +678,8 @@ class App:
         self.lbl_detect = ttk.Label(fact, text="", style="Info.TLabel")
         self.lbl_detect.grid(row=1, column=0, columnspan=4, sticky="w", pady=(6, 0))
 
-        ttk.Label(fact, text="Nuevo ID:", font=("Arial", 11)).grid(row=2, column=0, sticky="e", pady=(8, 0))
-        self.spin_newid = ttk.Spinbox(fact, from_=1, to=247, width=5, font=("Arial", 11))
+        ttk.Label(fact, text="Nuevo ID:", font=("Arial", 9)).grid(row=2, column=0, sticky="e", pady=(8, 0))
+        self.spin_newid = ttk.Spinbox(fact, from_=1, to=247, width=5, font=("Arial", 9))
         self.spin_newid.set(2)
         self.spin_newid.grid(row=2, column=1, sticky="w", pady=(8, 0))
         ttk.Button(fact, text="CAMBIAR ID", style="Aviot.TButton",
@@ -687,8 +687,8 @@ class App:
         self.lbl_id = ttk.Label(fact, text="", style="Info.TLabel")
         self.lbl_id.grid(row=3, column=0, columnspan=4, sticky="w", pady=(4, 0))
 
-        ttk.Label(fact, text="Nuevo baud:", font=("Arial", 11)).grid(row=4, column=0, sticky="e", pady=(8, 0))
-        self.combo_newbaud = ttk.Combobox(fact, width=8, font=("Arial", 11), state="readonly")
+        ttk.Label(fact, text="Nuevo baud:", font=("Arial", 9)).grid(row=4, column=0, sticky="e", pady=(8, 0))
+        self.combo_newbaud = ttk.Combobox(fact, width=8, font=("Arial", 9), state="readonly")
         self.combo_newbaud.grid(row=4, column=1, sticky="w", pady=(8, 0))
         ttk.Button(fact, text="CAMBIAR BAUDRATE", style="Aviot.TButton",
                    command=self.cambiar_baud).grid(row=4, column=2, pady=(8, 0))
@@ -707,7 +707,7 @@ class App:
         flog.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 10))
         flog.columnconfigure(0, weight=1)
         flog.rowconfigure(0, weight=1)
-        self.txt_log = scrolledtext.ScrolledText(flog, height=8, font=("Consolas", 9),
+        self.txt_log = scrolledtext.ScrolledText(flog, height=6, font=("Consolas", 8),
                                                  bg="#111", fg="#d6d6d6",
                                                  insertbackground="#fff", wrap="none")
         self.txt_log.grid(row=0, column=0, sticky="nsew")
@@ -879,6 +879,8 @@ class App:
             # 3) escaneo 1..247
             self.log("Escaneando IDs 1-247...")
             for s in range(1, 248):
+                self.root.after(0, lambda s=s: self.lbl_detect.config(
+                    text=f"Escaneando ID {s}/247...", style="Info.TLabel"))
                 d = self.device.poll(self.ser, s, verbose=False)
                 if d.get("ok"):
                     self.slave_id = s
