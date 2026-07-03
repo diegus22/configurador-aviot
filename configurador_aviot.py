@@ -271,6 +271,58 @@ class DeviceTH(Device):
 
 
 # --------------------------------------------------------------------------
+class DeviceCO2Pujante(Device):
+    """Sensor de CO2 chino (Pujante). Solo CO2, registro 0x0000 en ppm directo.
+    Mapa verificado por barrido: 0x0000 = CO2 (vivo); 0x0002 lo duplica; los
+    registros 0x0009/0x000A/0x0030/0x0031/0x0033/0x0036/0x0039 son constantes
+    de configuracion (fondo de escala 5000, offset, etc.). No tiene Tª ni HR."""
+    KEY = "co2pujante"
+    LABEL = "Sonda CO2 china (Pujante) [solo CO2]"
+    DEFAULT_BAUD = 4800
+    BAUDS = [2400, 4800, 9600, 19200, 38400]
+    DEFAULT_ID = 1
+    HELP = ("Sensor de CO2 chino que SOLO mide CO2 (no tiene temperatura ni "
+            "humedad). FC03/FC04 registro 0x0000 = CO2 en ppm directo. Por "
+            "defecto 4800 8N1. Cambio de ID/baud no confirmado (no se toca).")
+
+    def build_panel(self, parent, app):
+        self.app = app
+        f = ttk.Frame(parent)
+        f.pack(fill="both", expand=True)
+        cell = ttk.LabelFrame(f, text=" CO2 ", padding=14)
+        cell.pack(anchor="w")
+        self.lbl_co2 = ttk.Label(cell, text="---", style="Big.TLabel")
+        self.lbl_co2.pack()
+        ttk.Label(cell, text="ppm", style="Info.TLabel").pack()
+        self.lbl_estado = ttk.Label(
+            f, text="Detecta y pulsa 'Lectura continua'. Sopla cerca y vera subir el CO2.",
+            style="Info.TLabel", wraplength=620, justify="left")
+        self.lbl_estado.pack(anchor="w", pady=(10, 0))
+
+    def poll(self, ser, slave_id, log=None, verbose=False):
+        regs = read_holding(ser, slave_id, 0x0000, 1, log=log, verbose=verbose)
+        if not regs:
+            return {"ok": False}
+        co2 = regs[0]
+        return {"ok": True, "co2": co2, "summary": f"CO2={co2}ppm"}
+
+    def update_panel(self, data):
+        if not data.get("ok"):
+            return
+        self.lbl_co2.config(text=str(data["co2"]))
+        if data["co2"] == 0:
+            self.lbl_estado.config(text="⚠ CO2 = 0: puede estar calentando (warm-up).",
+                                   style="Warn.TLabel")
+        else:
+            self.lbl_estado.config(text="✅ Midiendo CO2 correctamente.", style="OK.TLabel")
+
+    def change_id(self, ser, current_id, new_id, log=None):
+        if log:
+            log("Cambio de ID no confirmado para este CO2 chino; no se toca.", "warn")
+        return False, None
+
+
+# --------------------------------------------------------------------------
 class DeviceCO2(Device):
     KEY = "co2"
     LABEL = "Sonda CO2 (SenseCAP S-CO2-03)"
@@ -529,8 +581,157 @@ def write_single_fc05(ser, slave_id, channel, value, log=None):
     return crc_ok(resp) and len(resp) >= 6 and resp[1] == 0x05
 
 
+# Rango plausible de CO2 en ppm (aire ~400-1200; aliento, miles)
+CO2_MIN, CO2_MAX = 300, 10000
+
+
+def pista_registro(val):
+    """Pista de que podria representar el valor crudo de un registro."""
+    p = []
+    if CO2_MIN <= val <= CO2_MAX:
+        p.append("CO2?")
+    if 0 < val <= 850 or 50000 <= val <= 65535:
+        p.append("temp?/10")
+    if 0 < val <= 1000:
+        p.append("hum?/10")
+    return " ".join(p)
+
+
+# --------------------------------------------------------------------------
+class DeviceExplorer(Device):
+    """Explorador generico: barre registros Modbus de un equipo desconocido."""
+    KEY = "explorer"
+    LABEL = "Explorador de registros (sensor desconocido)"
+    DEFAULT_BAUD = 9600
+    BAUDS = [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200]
+    DEFAULT_ID = 1
+    HELP = ("Para sensores cuyo mapa de registros NO conoces. Barre los registros "
+            "(FC03 holding y FC04 input), valida CRC y MARCA los que parecen CO2 "
+            "(ppm), temperatura o humedad. Con 'Lectura continua' monitoriza los "
+            "candidatos: sopla cerca del sensor y veras subir el de CO2.")
+
+    def build_panel(self, parent, app):
+        self.app = app
+        self.cands = []            # [(fc, addr)] candidatos a CO2
+        self.row_by_key = {}       # (fc,addr) -> iid en el treeview
+
+        f = ttk.Frame(parent)
+        f.pack(fill="both", expand=True)
+
+        ctl = ttk.Frame(f)
+        ctl.pack(fill="x")
+        ttk.Label(ctl, text="Reg. inicial (hex):", font=("Arial", 9)).grid(row=0, column=0, sticky="w")
+        self.e_ini = ttk.Entry(ctl, width=8, font=("Arial", 9))
+        self.e_ini.insert(0, "0x0000")
+        self.e_ini.grid(row=0, column=1, padx=4)
+        ttk.Label(ctl, text="final (hex):", font=("Arial", 9)).grid(row=0, column=2, sticky="w")
+        self.e_fin = ttk.Entry(ctl, width=8, font=("Arial", 9))
+        self.e_fin.insert(0, "0x0040")
+        self.e_fin.grid(row=0, column=3, padx=4)
+        self.var_fc03 = tk.BooleanVar(value=True)
+        self.var_fc04 = tk.BooleanVar(value=True)
+        ttk.Checkbutton(ctl, text="FC03", variable=self.var_fc03).grid(row=0, column=4, padx=(8, 0))
+        ttk.Checkbutton(ctl, text="FC04", variable=self.var_fc04).grid(row=0, column=5)
+        ttk.Button(ctl, text="BARRER", style="Aviot.TButton",
+                   command=lambda: self.app.run_async(self._scan)).grid(row=0, column=6, padx=6)
+
+        self.lbl_prog = ttk.Label(f, text="", style="Info.TLabel")
+        self.lbl_prog.pack(anchor="w", pady=(4, 2))
+
+        cols = ("fc", "reg", "val", "hex", "pista")
+        wrap = ttk.Frame(f)
+        wrap.pack(fill="both", expand=True)
+        self.tree = ttk.Treeview(wrap, columns=cols, show="headings", height=8)
+        for c, t, w in (("fc", "FC", 45), ("reg", "Registro", 80),
+                        ("val", "Valor", 70), ("hex", "Hex", 70),
+                        ("pista", "Pista", 150)):
+            self.tree.heading(c, text=t)
+            self.tree.column(c, width=w, anchor="center")
+        sb = ttk.Scrollbar(wrap, orient="vertical", command=self.tree.yview)
+        self.tree.configure(yscrollcommand=sb.set)
+        self.tree.pack(side="left", fill="both", expand=True)
+        sb.pack(side="right", fill="y")
+        self.tree.tag_configure("co2", background="#c8f7c5")
+
+    def _parse(self, entry, default):
+        try:
+            return int(entry.get(), 0)
+        except ValueError:
+            return default
+
+    def _scan(self):
+        ser, sid = self.app.ser, self.app.slave_id
+        ini = self._parse(self.e_ini, 0x0000)
+        fin = self._parse(self.e_fin, 0x0040)
+        fcs = []
+        if self.var_fc03.get():
+            fcs.append(0x03)
+        if self.var_fc04.get():
+            fcs.append(0x04)
+        if not fcs:
+            return
+        self.cands = []
+        self.row_by_key = {}
+        self.app.root.after(0, lambda: self.tree.delete(*self.tree.get_children()))
+        self.app.log(f"--- BARRIDO 0x{ini:04X}-0x{fin:04X} ID {sid} ---")
+        validos = 0
+        for fc in fcs:
+            for addr in range(ini, fin + 1):
+                self.app.root.after(0, lambda fc=fc, a=addr: self.lbl_prog.config(
+                    text=f"Barriendo FC{fc:02X} reg 0x{a:04X}..."))
+                regs = read_holding(ser, sid, addr, 1, fc=fc, verbose=False)
+                if not regs:
+                    continue
+                val = regs[0]
+                validos += 1
+                pista = pista_registro(val)
+                es_co2 = CO2_MIN <= val <= CO2_MAX
+                if es_co2:
+                    self.cands.append((fc, addr))
+                self.app.root.after(0, lambda fc=fc, a=addr, v=val, p=pista, c=es_co2:
+                                    self._add_row(fc, a, v, p, c))
+        self.app.root.after(0, lambda: self.lbl_prog.config(
+            text=f"Barrido terminado: {validos} registros validos, "
+                 f"{len(self.cands)} candidato(s) a CO2. "
+                 f"Usa 'Lectura continua' y sopla para confirmar.",
+            style="OK.TLabel"))
+        self.app.log(f"Barrido: {validos} validos, {len(self.cands)} candidatos CO2.", "ok")
+
+    def _add_row(self, fc, addr, val, pista, es_co2):
+        iid = self.tree.insert("", "end",
+                               values=(f"{fc:02X}", f"0x{addr:04X}", val,
+                                       f"0x{val:04X}", pista),
+                               tags=("co2",) if es_co2 else ())
+        self.row_by_key[(fc, addr)] = iid
+
+    def poll(self, ser, slave_id, log=None, verbose=False):
+        """Para 'Lectura continua': relee los candidatos a CO2."""
+        if not self.cands:
+            return {"ok": False}
+        vals = {}
+        for fc, addr in self.cands:
+            regs = read_holding(ser, slave_id, addr, 1, fc=fc, verbose=verbose)
+            if regs:
+                vals[(fc, addr)] = regs[0]
+        return {"ok": bool(vals), "vals": vals,
+                "summary": "  ".join(f"0x{a:04X}={v}" for (fc, a), v in vals.items())}
+
+    def update_panel(self, data):
+        for (fc, addr), val in data.get("vals", {}).items():
+            iid = self.row_by_key.get((fc, addr))
+            if iid:
+                self.tree.set(iid, "val", val)
+                self.tree.set(iid, "hex", f"0x{val:04X}")
+
+    def change_id(self, ser, current_id, new_id, log=None):
+        if log:
+            log("Cambio de ID no disponible en el Explorador (mapa desconocido).", "warn")
+        return False, None
+
+
 # Orden de los dispositivos en el selector
-DEVICE_CLASSES = [DeviceTH, DeviceCO2, DeviceIO, DeviceIO16]
+DEVICE_CLASSES = [DeviceTH, DeviceCO2, DeviceCO2Pujante, DeviceIO, DeviceIO16,
+                  DeviceExplorer]
 
 
 # ===========================================================================

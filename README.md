@@ -9,8 +9,16 @@ todos los dispositivos Modbus RTU que utiliza Aviot, desde una sola herramienta.
 |---|---|---|---|---|
 | Sonda Temperatura / Humedad | 4800 8N1 | — | FC03 `0x0000` (HR/10), `0x0001` (Tª/10) | FC06 `0x07D0` |
 | Sonda CO2 (SenseCAP S-CO2-03) | 9600 8N1 | 45 | FC03 `0x0000` CO2, `0x0001` Tª/100, `0x0002` HR/100 | FC06 `0x0010` |
+| Sonda CO2 china (Pujante) [solo CO2] | 4800 8N1 | 1 | FC03/FC04 `0x0000` CO2 (ppm directo) | no confirmado |
 | Módulo E/S 8 canales (Waveshare IO 8CH) | 9600 8N1 | 1 | FC01 relés / FC02 entradas / FC05 control | broadcast FC06 `0x4000` |
 | Módulo E/S 16 canales (IO 16CH) | 9600 8N1 | 1 | variante 16 canales del IO 8CH | broadcast FC06 `0x4000` |
+
+Además, un **Explorador de registros** para sensores desconocidos: barre los
+registros (FC03/FC04), valida CRC y marca los que parecen CO2/temperatura/humedad,
+con monitor en vivo para confirmar cuál es cuál.
+
+> **CO2 china (Pujante)**: mapa verificado por barrido — este sensor **solo mide
+> CO2** en `0x0000` (ppm directo). No tiene temperatura ni humedad reales.
 
 > **IO 16CH**: implementado como variante de 16 canales del protocolo Waveshare.
 > Pendiente de verificar con el hardware real (mapa de registros y baudrate
