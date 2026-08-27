@@ -673,16 +673,45 @@ class DeviceSINDT(Device):
             if log:
                 log(f"Baud {new_baud} no soportado por el SINDT.", "warn")
             return None, "unsupported"
+        old_baud = ser.baudrate
+
+        # 1. Desbloquear (a la velocidad actual, con eco normal)
+        if not write_single(ser, slave_id, self.UNLOCK_REG, self.UNLOCK_VAL, log=log):
+            return False, "reconnect"
+        time.sleep(0.25)
+
+        # 2. Escribir el baud nuevo. El sensor cambia de velocidad AL INSTANTE,
+        #    así que su eco llega ya a la velocidad nueva y se pierde: se ignora.
+        write_single(ser, slave_id, self.BAUD_REG, code, log=log)
+        time.sleep(0.4)
+
+        # 3. Saltar el puerto a la velocidad nueva y comprobar que responde
+        ser.baudrate = new_baud
+        time.sleep(0.2)
+        ser.reset_input_buffer()
+        if not self.poll(ser, slave_id).get("ok"):
+            if log:
+                log(f"El sensor no responde a {new_baud} — vuelvo a {old_baud}.", "err")
+            ser.baudrate = old_baud
+            time.sleep(0.2)
+            ser.reset_input_buffer()
+            return False, "reconnect"
+
+        # 4. GUARDAR en flash a la velocidad nueva (sin esto, el cambio se
+        #    pierde al quitar la alimentación — la trampa del WitMotion)
         ok = self._write_seq(ser, slave_id,
                              [(self.UNLOCK_REG, self.UNLOCK_VAL),
-                              (self.BAUD_REG, code)], log=log)
-        if not ok:
+                              (self.SAVE_REG, 0x0000)], log=log)
+        time.sleep(0.3)
+        if not (ok and self.poll(ser, slave_id).get("ok")):
+            if log:
+                log("Cambió de velocidad pero el GUARDADO no se confirmó — "
+                    "repite el cambio o verifica tras un power-cycle.", "warn")
             return False, "reconnect"
-        # tras el cambio el sensor ya habla al baud nuevo: el guardado se hace
-        # al reconectar (boton de guardar) o via change_id; avisar en el log
+
         if log:
-            log("Baud cambiado. Reconecta al baud nuevo y guarda (el 'Detectar' "
-                "tras reconectar + cambio de ID persisten la config).", "warn")
+            log(f"Baud {new_baud} verificado y GUARDADO en flash. "
+                "Haz un power-cycle del sensor y re-Detecta para confirmar.", "ok")
         return True, "reconnect"
 
 
