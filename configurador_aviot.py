@@ -658,13 +658,22 @@ class DeviceSINDT(Device):
         return True
 
     def change_id(self, ser, current_id, new_id, log=None):
+        # 1. Desbloquear y escribir el ID nuevo (al ID actual)
         ok = self._write_seq(ser, current_id,
                              [(self.UNLOCK_REG, self.UNLOCK_VAL),
-                              (self.ID_REG, new_id),
-                              (self.UNLOCK_REG, self.UNLOCK_VAL),
-                              (self.SAVE_REG, 0x0000)], log=log)
+                              (self.ID_REG, new_id)], log=log)
+        time.sleep(0.4)
+        # 2. El sensor ya responde en el ID NUEVO al instante: el desbloqueo y
+        #    el GUARDADO en flash deben ir al ID nuevo — mandarlos al viejo los
+        #    tira al vacío y el cambio se pierde en el siguiente power-cycle.
+        ok = self._write_seq(ser, new_id,
+                             [(self.UNLOCK_REG, self.UNLOCK_VAL),
+                              (self.SAVE_REG, 0x0000)], log=log) and ok
         time.sleep(0.4)
         data = self.poll(ser, new_id, log=log, verbose=True)
+        if data.get("ok") and log:
+            log(f"ID {new_id} activo y guardado en flash. Power-cycle y "
+                "re-Detecta para confirmar que persiste.", "ok")
         return ok, (new_id if data.get("ok") else None)
 
     def change_baud(self, ser, slave_id, new_baud, log=None):
