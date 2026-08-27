@@ -598,6 +598,95 @@ def pista_registro(val):
 
 
 # --------------------------------------------------------------------------
+class DeviceSINDT(Device):
+    KEY = "sindt"
+    LABEL = "Inclinometro WitMotion SINDT (volteo)"
+    DEFAULT_BAUD = 9600
+    BAUDS = [4800, 9600, 19200, 38400, 57600, 115200]
+    DEFAULT_ID = 0x50
+    HELP = ("Inclinometro WitMotion SINDT-RS485 (volteo de bandejas en incubadoras). "
+            "FC03 registros 0x3D (Roll) y 0x3E (Pitch), con signo, x180/32768 grados. "
+            "Cambio de ID/baud con desbloqueo previo (0x69=0xB588), ID en 0x1A, "
+            "baud en 0x04, y guardado en 0x00. De fabrica: ID 0x50 (80) a 9600 8N1. "
+            "En AvIoT: ID = 30 + numero de grupo de volteo (G1=31 ... G10=40).")
+
+    UNLOCK_REG, UNLOCK_VAL = 0x69, 0xB588
+    ID_REG, BAUD_REG, SAVE_REG = 0x1A, 0x04, 0x00
+    BAUD_CODES = {4800: 1, 9600: 2, 19200: 3, 38400: 4, 57600: 5, 115200: 6}
+
+    def build_panel(self, parent, app):
+        self.app = app
+        f = ttk.Frame(parent)
+        f.pack(fill="both", expand=True)
+        self.lbl_angulo = ttk.Label(f, text="Ángulo bandeja:  ---", style="Big.TLabel")
+        self.lbl_angulo.pack(anchor="w", pady=4)
+        self.lbl_ejes = ttk.Label(f, text="Roll: ---   Pitch: ---", style="Big.TLabel")
+        self.lbl_ejes.pack(anchor="w", pady=4)
+        self.lbl_veredicto = ttk.Label(
+            f, text="Detecta el inclinometro e inclinalo con la mano: el angulo debe "
+                    "seguirte y cambiar de signo al cruzar la vertical.",
+            style="Info.TLabel", wraplength=620, justify="left")
+        self.lbl_veredicto.pack(anchor="w", pady=(10, 0))
+
+    def poll(self, ser, slave_id, log=None, verbose=False):
+        regs = read_holding(ser, slave_id, 0x3D, 2, log=log, verbose=verbose)
+        if not regs:
+            return {"ok": False}
+        roll = to_signed16(regs[0]) / 32768.0 * 180.0
+        pitch = to_signed16(regs[1]) / 32768.0 * 180.0
+        angulo = (90.0 - pitch) * (1.0 if roll >= 0 else -1.0)
+        angulo = max(-90.0, min(90.0, angulo))
+        return {"ok": True, "roll": round(roll, 1), "pitch": round(pitch, 1),
+                "angulo": round(angulo, 1),
+                "summary": f"angulo={round(angulo,1)} roll={round(roll,1)} pitch={round(pitch,1)}"}
+
+    def update_panel(self, data):
+        if not data.get("ok"):
+            return
+        self.lbl_angulo.config(text=f"Ángulo bandeja:  {data['angulo']} °")
+        self.lbl_ejes.config(text=f"Roll: {data['roll']} °   Pitch: {data['pitch']} °")
+        self.lbl_veredicto.config(
+            text="✅ Mide y comunica. El firmware AvIoT cuenta volteos por cambio "
+                 "de signo del angulo (banda muerta ±2°).",
+            style="OK.TLabel")
+
+    def _write_seq(self, ser, slave_id, pares, log=None):
+        for reg, val in pares:
+            if not write_single(ser, slave_id, reg, val, log=log):
+                return False
+            time.sleep(0.25)
+        return True
+
+    def change_id(self, ser, current_id, new_id, log=None):
+        ok = self._write_seq(ser, current_id,
+                             [(self.UNLOCK_REG, self.UNLOCK_VAL),
+                              (self.ID_REG, new_id),
+                              (self.UNLOCK_REG, self.UNLOCK_VAL),
+                              (self.SAVE_REG, 0x0000)], log=log)
+        time.sleep(0.4)
+        data = self.poll(ser, new_id, log=log, verbose=True)
+        return ok, (new_id if data.get("ok") else None)
+
+    def change_baud(self, ser, slave_id, new_baud, log=None):
+        code = self.BAUD_CODES.get(new_baud)
+        if code is None:
+            if log:
+                log(f"Baud {new_baud} no soportado por el SINDT.", "warn")
+            return None, "unsupported"
+        ok = self._write_seq(ser, slave_id,
+                             [(self.UNLOCK_REG, self.UNLOCK_VAL),
+                              (self.BAUD_REG, code)], log=log)
+        if not ok:
+            return False, "reconnect"
+        # tras el cambio el sensor ya habla al baud nuevo: el guardado se hace
+        # al reconectar (boton de guardar) o via change_id; avisar en el log
+        if log:
+            log("Baud cambiado. Reconecta al baud nuevo y guarda (el 'Detectar' "
+                "tras reconectar + cambio de ID persisten la config).", "warn")
+        return True, "reconnect"
+
+
+# --------------------------------------------------------------------------
 class DeviceExplorer(Device):
     """Explorador generico: barre registros Modbus de un equipo desconocido."""
     KEY = "explorer"
@@ -730,8 +819,8 @@ class DeviceExplorer(Device):
 
 
 # Orden de los dispositivos en el selector
-DEVICE_CLASSES = [DeviceTH, DeviceCO2, DeviceCO2Pujante, DeviceIO, DeviceIO16,
-                  DeviceExplorer]
+DEVICE_CLASSES = [DeviceTH, DeviceCO2, DeviceCO2Pujante, DeviceSINDT,
+                  DeviceIO, DeviceIO16, DeviceExplorer]
 
 
 # ===========================================================================
